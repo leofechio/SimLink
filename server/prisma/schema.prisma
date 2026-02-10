@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Device {
+  id           String   @id @default(uuid())
+  pairingCode  String?  @unique
+  role         String   @default("AGENT") // AGENT (Brazil) or CLIENT (Abroad)
+  peerId       String?  // Linked device ID
+  status       String   @default("DISCONNECTED")
+  lastHeartbeat DateTime @default(now())
+  createdAt    DateTime @default(now())
+  
+  messages     Message[]
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  deviceId  String
+  from      String
+  content   String
+  timestamp DateTime @default(now())
+  
+  device    Device   @relation(fields: [deviceId], references: [id])
+}

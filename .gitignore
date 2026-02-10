@@ -1,0 +1,14 @@
+node_modules
+*.log
+*.db
+dist
+.expo
+.eas
+build
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+.env
+.local
