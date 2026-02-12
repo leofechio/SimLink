@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert, Platform, TextInput } from 'react-native';
 import { io } from 'socket.io-client';
 import * as Device from 'expo-device';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Smartphone, Globe, QrCode, MessageSquare, Battery, Activity } from 'lucide-react-native';
 
-// Constants
+// Constantes - IP REAL DA VPS
 const SERVER_URL = 'http://31.97.157.146:3005';
 
 export default function App() {
     const [role, setRole] = useState<'AGENT' | 'CLIENT' | null>(null);
     const [deviceId, setDeviceId] = useState('');
     const [socket, setSocket] = useState<any>(null);
-    const [status, setStatus] = useState('DISCONNECTED');
+    const [status, setStatus] = useState('DESCONECTADO');
     const [messages, setMessages] = useState<any[]>([]);
     const [pairingCode, setPairingCode] = useState('');
+    const [inputCode, setInputCode] = useState('');
 
     useEffect(() => {
         initDevice();
@@ -28,7 +29,6 @@ export default function App() {
         }
         setDeviceId(id);
 
-        // Load saved role if exists
         const savedRole = await AsyncStorage.getItem('userRole');
         if (savedRole) setRole(savedRole as any);
     };
@@ -52,10 +52,24 @@ export default function App() {
 
         s.on('pairing_success', (data: { peerId: string }) => {
             Alert.alert('Sucesso', 'Dispositivo pareado!');
-            setStatus('PAIRED');
+            setStatus('PAREADO');
+        });
+
+        s.on('disconnect', () => setStatus('OFFLINE'));
+
+        s.on('pairing_error', (data: { message: string }) => {
+            Alert.alert('Erro no Pareamento', data.message);
         });
 
         return s;
+    };
+
+    const pairDevice = () => {
+        if (!inputCode) {
+            Alert.alert('Erro', 'Digite o código de pareamento.');
+            return;
+        }
+        socket.emit('pair_with_code', { deviceId, code: inputCode.toUpperCase() });
     };
 
     const selectRole = async (selectedRole: 'AGENT' | 'CLIENT') => {
@@ -90,7 +104,7 @@ export default function App() {
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>SimLink {role === 'AGENT' ? '(Brasil)' : '(Exterior)'}</Text>
                 <View style={styles.statusBadge}>
-                    <Activity size={12} color={status === 'PAIRED' ? '#4ade80' : '#fbbf24'} />
+                    <Activity size={12} color={status === 'PAREADO' ? '#4ade80' : '#fbbf24'} />
                     <Text style={styles.statusText}>{status}</Text>
                 </View>
             </View>
@@ -100,7 +114,7 @@ export default function App() {
                     <>
                         <TouchableOpacity style={styles.actionButton} onPress={() => socket.emit('generate_pairing_code', { deviceId })}>
                             <QrCode color="#fff" size={20} />
-                            <Text style={styles.actionButtonText}>Geral Código de Pareamento</Text>
+                            <Text style={styles.actionButtonText}>Gerar Código de Pareamento</Text>
                         </TouchableOpacity>
 
                         {pairingCode ? (
@@ -129,15 +143,32 @@ export default function App() {
                         <Text style={styles.agentMainText}>Servidor Ativo</Text>
                         <Text style={styles.agentSubText}>Este celular está pronto para encaminhar SMS.</Text>
 
+                        {status !== 'PAREADO' && (
+                            <View style={styles.pairingInputContainer}>
+                                <Text style={styles.inputLabel}>Digite o código do outro celular:</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Ex: A1B2C3"
+                                    value={inputCode}
+                                    onChangeText={setInputCode}
+                                    autoCapitalize="characters"
+                                    maxLength={6}
+                                />
+                                <TouchableOpacity style={styles.pairButton} onPress={pairDevice}>
+                                    <Text style={styles.pairButtonText}>Parear Agora</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
                         <View style={styles.statsRow}>
                             <View style={styles.statItem}>
                                 <MessageSquare size={20} color="#666" />
-                                <Text style={styles.statValue}>14</Text>
+                                <Text style={styles.statValue}>---</Text>
                                 <Text style={styles.statLabel}>Enviados</Text>
                             </View>
                             <View style={styles.statItem}>
                                 <Battery size={20} color="#666" />
-                                <Text style={styles.statValue}>88%</Text>
+                                <Text style={styles.statValue}>Monitorando</Text>
                                 <Text style={styles.statLabel}>Bateria</Text>
                             </View>
                         </View>
@@ -186,5 +217,10 @@ const styles = StyleSheet.create({
     statValue: { fontSize: 22, fontWeight: '700', marginTop: 5 },
     statLabel: { fontSize: 12, color: '#9ca3af' },
     resetBtn: { margin: 20, padding: 15, alignItems: 'center' },
-    resetBtnText: { color: '#9ca3af', fontWeight: '500' }
+    resetBtnText: { color: '#9ca3af', fontWeight: '500' },
+    pairingInputContainer: { marginTop: 30, width: '100%', alignItems: 'center' },
+    inputLabel: { fontSize: 14, color: '#4b5563', marginBottom: 8 },
+    input: { backgroundColor: '#fff', width: '80%', padding: 15, borderRadius: 12, textAlign: 'center', fontSize: 18, fontWeight: '700', borderWidth: 1, borderColor: '#d1d5db', marginBottom: 15 },
+    pairButton: { backgroundColor: '#10b981', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 12 },
+    pairButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 }
 });
