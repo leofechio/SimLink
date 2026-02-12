@@ -21,6 +21,12 @@ export default function App() {
         initDevice();
     }, []);
 
+    useEffect(() => {
+        if (role && deviceId && !socket) {
+            connectServer(role);
+        }
+    }, [role, deviceId]);
+
     const initDevice = async () => {
         let id = await AsyncStorage.getItem('deviceId');
         if (!id) {
@@ -69,13 +75,25 @@ export default function App() {
             Alert.alert('Erro', 'Digite o código de pareamento.');
             return;
         }
+        if (!socket) {
+            Alert.alert('Erro', 'Sem conexão com o servidor. Tente reiniciar o app.');
+            return;
+        }
         socket.emit('pair_with_code', { deviceId, code: inputCode.toUpperCase() });
+    };
+
+    const handleGenerateCode = () => {
+        if (!socket) {
+            Alert.alert('Erro', 'Sem conexão com o servidor. Tente reiniciar o app.');
+            return;
+        }
+        socket.emit('generate_pairing_code', { deviceId });
     };
 
     const selectRole = async (selectedRole: 'AGENT' | 'CLIENT') => {
         setRole(selectedRole);
         await AsyncStorage.setItem('userRole', selectedRole);
-        connectServer(selectedRole);
+        // Connection handled by useEffect
     };
 
     if (!role) {
@@ -112,7 +130,7 @@ export default function App() {
             <ScrollView style={styles.content}>
                 {role === 'CLIENT' ? (
                     <>
-                        <TouchableOpacity style={styles.actionButton} onPress={() => socket.emit('generate_pairing_code', { deviceId })}>
+                        <TouchableOpacity style={styles.actionButton} onPress={handleGenerateCode}>
                             <QrCode color="#fff" size={20} />
                             <Text style={styles.actionButtonText}>Gerar Código de Pareamento</Text>
                         </TouchableOpacity>
